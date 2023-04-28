@@ -1,0 +1,78 @@
+---
+title: "Geneset enrichment: IFN-I"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+```{r}
+source("src/00_library.R")
+seu <- readRDS(paste0(dirs["rds"],"seu_corrected_clean.RDS"))
+# Add merged by donor column to metadata
+seu$merge <- paste0(seu$sample, "_", seu$condition)
+seu$sample_time = paste(seu$sample, seu$time)
+```
+
+
+# AUCell: IFN-I response
+```{r}
+ifn <- getGmt("genesets/ifn1_response.gmt")
+run_AUC(seu, ifn, title = "ifn_I_response")
+plot_AUC(seu,
+         group_by = c("seurat_clusters", "condition", "merge"),
+         scales = c("column", "none"),
+         AUCmatrix = read.table(paste0(dirs[["auc"]], "ifn_I_response.csv")))
+```
+
+
+# Plot Feature and Violin plot
+```{r}
+# load AUC table
+auc <- read.table("output/AUC/ifn_I_response.csv")
+seu$IFNI_sig_path_GO_65_genes <- auc$IFNI_sig_path_GO_65_genes
+
+# FeaturePlot
+FeaturePlot(seu, features="IFNI_sig_path_GO_65_genes") +
+  ggtitle("Type I Interferon Signaling Pathway (GO)") +
+  labs(color = "AUC") 
+
+# ViolinPlot + Statistics
+VlnPlot(seu, features="IFNI_sig_path_GO_65_genes",
+        group.by = "treatment", pt.size = 0) +
+  scale_fill_manual(values=colors[["treatment"]]) +
+  geom_boxplot(width = 0.1, fill = "white", outlier.size = 0) +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5), legend.position = "none") +
+  ylab(label="AUC") + ggtitle("Type I Interferon Signaling Pathway (GO)") + xlab("") +
+  stat_compare_means(method = "wilcox", ref.group = "Unstim") +
+  ylim(c(0, 0.45))
+```
+
+
+# Heatmap IFN-I response per donor
+```{r}
+# Plot the AUC in a UMAP using seurat clusters
+plot <- DimPlot(seu, group.by = "sample_time")
+
+# Make ggplot compatible dataset with AUC values
+df <- as.data.frame(cbind(plot$data$UMAP_1, plot$data$UMAP_2, plot$data["sample_time"]),
+                    row.names = rownames(plot$plot_env$data)) %>%
+  setNames(c("UMAP1", "UMAP2", "GROUPING")) %>%
+  merge(., auc, by = 0, all = TRUE) %>%
+  `rownames<-` (rownames(plot$plot_env$data)) %>%
+  dplyr::select(., -1)
+
+# Plot the AUC in a heatmap with all groupings
+df2 <- aggregate(.~GROUPING, df[,-(1:2)], FUN=mean)
+rownames(df2) <- df2$GROUPING
+df2 <- as.matrix(df2[,-1])
+df2 = df2[,sort(colnames(df2))]
+pheatmap(t(df2), color=colorRampPalette(c("steelblue", "slategray2", "white",
+                                "tan1", "firebrick3"))(100), scale = "none",
+         cluster_rows = F, cluster_cols = F, border_color = NA,
+         legend_breaks = c(0.18, 0.2, 0.22, 0.24),
+         legend_labels = c("0.18", "0.10", "0.22", "AUC\n"),
+         main = "Type I interferon-related gene sets")
+```
+

@@ -1,0 +1,138 @@
+---
+title: "Differential gene expression"
+output:
+  html_document:
+    toc: yes
+    toc_float: yes
+    toc_depth: 2
+---
+
+```{r}
+source("src/00_library.R")
+seu <- readRDS(paste0(dirs["rds"],"seu_donor_corrected_clean.RDS"))
+# Add merge to metacounts for per donor analysis
+seu$merge <- paste0(seu$sample, "_", seu$condition)
+DefaultAssay(seu) <- "RNA"
+```
+
+
+# DEG analysis
+Tables with all genes can be found in output/DEG
+```{r}
+# Pairwise comparisons in seurat object
+T0T_vs_T0U <- differential_testing(seu, "condition", "T0 CL097", "T0 Unstim")
+T3T_vs_T3U <- differential_testing(seu, "condition", "T3 CL097", "T3 Unstim")
+```
+
+
+# Pairwise comparison per donor
+```{r}
+# Pairwise comparisons in seurat object
+Donor1_T3T_vs_T0T <- differential_testing(seu, "merge",
+                                        "Donor1_T3 CL097", "Donor1_T0 CL097")
+print(EnhancedVolcano(Donor1_T3U_vs_T0U, lab = rownames(Donor1_T3T_vs_T0T),
+                      x = "avg_log2FC", y = "p_val_adj",
+                      title = "Donor1 T3T vs T0T",
+                      pCutoff = 0.05, FCcutoff = 0.25,
+                      xlim=c(-3, 3)) + theme_classic())
+
+Donor2_T3T_vs_T0T <- differential_testing(seu, "merge",
+                                        "Donor2_T3 CL097", "Donor2_T0 CL097")
+print(EnhancedVolcano(Donor2_T3U_vs_T0U, lab = rownames(Donor2_T3T_vs_T0T),
+                      x = "avg_log2FC", y = "p_val_adj",
+                      title = "Donor2 T3T vs T0T",
+                      pCutoff = 0.05, FCcutoff = 0.25,
+                      xlim=c(-3, 3)) + theme_classic())
+
+Donor3_T3T_vs_T0T <- differential_testing(seu, "merge",
+                                        "Donor3_T3 CL097", "Donor3_T0 CL097")
+print(EnhancedVolcano(Donor3_T3U_vs_T0U, lab = rownames(Donor3_T3T_vs_T0T),
+                      x = "avg_log2FC", y = "p_val_adj",
+                      title = "Donor3 T3T vs T0T",
+                      pCutoff = 0.05, FCcutoff = 0.25,
+                      xlim=c(-3, 3)) + theme_classic())
+
+```
+
+
+# Venn diagrams: per donor treated T3 vs T0
+```{r}
+display_venn(list(Unstim = rownames(Donor1_TP3U_vs_TP0U[Donor1_TP3U_vs_TP0U$avg_log2FC>0,]),
+                  CL097 = rownames(Donor1_TP3T_vs_TP0T[Donor1_TP3T_vs_TP0T$avg_log2FC>0,])),
+             main = "Donor 1", fill = colors[["treatment"]], scaled = F)
+```
+
+
+# Gene ontology dotplot
+```{r}
+# Perform gene ontology enrichment analysis
+# Upregulated genes
+go1u <- enrich_enrichr(row.names(Donor1_T3T_vs_T0T[Donor1_T3T_vs_T0T$avg_log2FC>0,]),
+                        "GOBP21_Donor1_CL097_T3_vs_T0_up",
+                        "GO_Biological_Process_2021",
+                        "output/DEG/")
+go2u <- enrich_enrichr(row.names(Donor2_T3T_vs_T0T[Donor2_T3T_vs_T0T$avg_log2FC>0,]),
+                        "GOBP21_Donor2_CL097_T3_vs_T0_up",
+                        "GO_Biological_Process_2021",
+                        "output/DEG/")
+go3u <- enrich_enrichr(row.names(Donor3_T3T_vs_T0T[Donor3_T3T_vs_T0T$avg_log2FC>0,]),
+                        "GOBP21_Donor3_CL097_T3_vs_T0_up",
+                        "GO_Biological_Process_2021",
+                        "output/DEG/")
+
+# Downregulated genes
+go1d <- enrich_enrichr(row.names(Donor1_T3T_vs_T0T[Donor1_T3T_vs_T0T$avg_log2FC<0,]),
+                        "GOBP21_Donor1_CL097_T3_vs_T0_up",
+                        "GO_Biological_Process_2021",
+                        "output/DEG/")
+go2d <- enrich_enrichr(row.names(Donor2_T3T_vs_T0T[Donor2_T3T_vs_T0T$avg_log2FC<0,]),
+                        "GOBP21_Donor2_CL097_T3_vs_T0_up",
+                        "GO_Biological_Process_2021",
+                        "output/DEG/")
+go3d <- enrich_enrichr(row.names(Donor3_T3T_vs_T0T[Donor3_T3T_vs_T0T$avg_log2FC<0,]),
+                        "GOBP21_Donor3_CL097_T3_vs_T0_up",
+                        "GO_Biological_Process_2021",
+                        "output/DEG/")
+
+# Give label to each sample + up or down
+go1u$label <- "up_Donor1"
+go2u$label <- "up_Donor2"
+go3u$label <- "up_Donor3"
+
+go1d$label <- "down_Donor1"
+go2d$label <- "down_Donor2"
+go3d$label <- "down_Donor3"
+
+# Make total GO table
+goMtx <- rbind(go1u[go1u$Adjusted.P.value<0.05,],
+               go2u[go2u$Adjusted.P.value<0.05,],
+               go3u[go3u$Adjusted.P.value<0.05,],
+               go1d[go1d$Adjusted.P.value<0.05,],
+               go2d[go2d$Adjusted.P.value<0.05,],
+               go3d[go3d$Adjusted.P.value<0.05,])
+
+# Make GO top table
+goMtxTop <- rbind(go1u[1:5,],
+                  go2u[1:5,],
+                  go3u[1:5,],
+                  go1d[1:5,],
+                  go2d[1:5,],
+                  go3d[1:5,])
+
+# Retrieve GOs from all comparisons from top table
+goMtxFinal <- goMtx[which(goMtx$Term %in% goMtxTop$Term),]
+
+# Remove(GO:XXXXX) from Term (it's too long)
+goMtxFinal$Term <- sub("\\ \\(.*", "", goMtxFinal$Term)
+
+# Plot
+ggplot(goMtxFinal, aes(size=-log10(Adjusted.P.value),
+                       x=factor(label),
+                       y=Term,
+                       color=factor(label))) +
+  geom_point() +
+  theme_classic() +
+  scale_color_manual(values = rep(c("#C3E580", "#5BC7E8", "#FC7E87"), 2)) +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+```
+

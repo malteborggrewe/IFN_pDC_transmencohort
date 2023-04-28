@@ -1,0 +1,50 @@
+---
+title: "UMAPs + Frequency plots + Violins"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+
+```{r}
+source("src/00_library.R")
+seu <- readRDS(paste0(dirs["rds"],"seu_corrected_clean.RDS"))
+DefaultAssay(seu) <- "RNA"
+
+# Define some variables to plot figures
+variables <- c("seurat_clusters", "sample", "condition", "treatment")
+features <- c("percent.mt", "nFeature_RNA", "nCount_RNA",
+              "CD3E", "CD3D", "CD19", "NCAM1", "ITGAX", "CD14",
+              "HLA-DRA", "HLA-DRB1","IL3RA")
+
+
+# UMAPs
+```{r}
+for(variable in variables) {
+  print(DimPlot(seu, reduction = "umap", group.by = variable, label = TRUE) +
+    scale_color_manual(values=colors[[variable]][unique(seu@meta.data[[variable]])]))
+}
+```
+
+
+# Frequency plots
+```{r frequencies, echo=FALSE}
+plot_freq_plot(seu$seurat_clusters, seu$condition,
+               legend = "seurat_clusters", x_lab = "condition",
+               palette = cluster_colors)
+```
+
+
+# Feature plots
+```{r feature-plots, echo=FALSE, out.width=c("50%", "50%")}
+for(feature in features) {
+  if(isTRUE(feature %in% rownames(seu)) || isTRUE(feature %in% names(seu@meta.data))) {
+    print(FeaturePlot(seu, reduction = "umap", features = c(feature)))
+  } else {
+    print(paste(feature, "not expressed in dataset."))
+  }
+}
+```
+

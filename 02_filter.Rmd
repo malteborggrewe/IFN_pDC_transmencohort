@@ -1,0 +1,76 @@
+---
+title: "Filter cells and genes"
+output:
+  html_notebook:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+
+```{r settings, include=FALSE}
+source("src/00_library.R")
+seu_un <- readRDS(paste0(dirs["rds"],"seu_unfiltered.RDS"))
+```
+
+
+```{r initial-filtering, include=FALSE}
+# Filter genes that are present in less than min_cells (default = 3)
+keep <- rownames(CreateSeuratObject(GetAssayData(seu_un),
+                           min.cells = seurat["min_cells"]))
+seu_un <- seu_un[keep,]
+# Calculate percent mitochondrial reads
+seu_un [["percent.mt"]] <- PercentageFeatureSet(seu_un, pattern = "^MT-")
+```
+
+
+# Filtering settings
+```{r filtering-thresholds, fig.width=10}
+# Visualize filters for doublet filtering and minimum features
+thresholds <- visualise_cell_filter(seu_un)
+# STOP!!!!!!!: Enter thresholds into 00_settings.R: 10^thresholds$low/high
+print(paste("Min cells: ", seurat["min_cells"]))
+print(paste("Lower threshold:", seurat["min_features"]))
+print(paste("Upper threshold:", seurat["max_features"]))
+print(paste("Percent MT threshold:", seurat["max_mt"]))
+
+# Filter based on mtDNA + nUMI + nGene
+# Too high of mtDNA could indicate low quality or dying cells
+# Too high of nUMI/nGene could indicate doublets
+# Too low of nUMI/nGene could indicate low quality cells
+seu <- subset(seu_un, subset = nFeature_RNA > seurat["min_features"] & 
+              nFeature_RNA < seurat["max_features"] &
+              percent.mt < seurat["max_mt"])
+```
+
+
+# QC before filtering
+```{r unfiltered, echo=FALSE, fig.width=10}
+VlnPlot(seu_un, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
+        ncol = 3, pt.size = 0.1, group.by = "sample")
+VlnPlot(seu_un, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
+        ncol = 3, pt.size = 0, group.by = "sample")
+FeatureScatter(seu_un, feature1 = "nCount_RNA", feature2 = "nFeature_RNA",
+               group.by = "sample")
+print("Number of cells before filtering:")
+table(seu_un$sample)
+```
+
+
+# QC after filtering
+```{r filtered, echo=FALSE, fig.width=10}
+VlnPlot(seu, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
+        ncol = 3, pt.size = 0.1, group.by = "sample")
+VlnPlot(seu, features = c("nFeature_RNA", "nCount_RNA", "percent.mt"),
+        ncol = 3, pt.size = 0, group.by = "sample")
+FeatureScatter(seu, feature1 = "nCount_RNA", feature2 = "nFeature_RNA",
+               group.by = "sample")
+print("Number of cells after filtering:")
+table(seu$sample)
+```
+
+
+```{r save, include=FALSE}
+saveRDS(seu, paste0(dirs["rds"],"seu.RDS"))
+```
+

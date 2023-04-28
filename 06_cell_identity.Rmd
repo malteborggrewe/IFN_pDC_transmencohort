@@ -1,0 +1,32 @@
+---
+title: "Geneset enrichment: Cell identity"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+
+```{r}
+source("src/00_library.R")
+seu <- readRDS(paste0(dirs["rds"],"seu_corrected_clean.RDS"))
+```
+
+
+```{r}
+immune <- getGmt("genesets/immune_cells.gmt")
+names(immune)
+geneIds(immune)[[1]]
+```
+
+
+# AUCell
+```{r}
+run_AUC(seu, immune, title = "immune_types")
+plot_AUC(seu,
+         group_by = c("seurat_clusters", "condition"),
+         scales = c("row", "none"),
+         AUCmatrix = read.table(paste0(dirs[["auc"]], "immune_types.csv")))
+```
+
